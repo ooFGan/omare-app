@@ -167,6 +167,12 @@ const App = (() => {
                      placeholder="••••••••" autocomplete="current-password" required>
             </div>
 
+            <div class="form-group" id="group-confirm-password" style="display:none;">
+              <label class="form-label" for="login-password-confirm">Repetir Contraseña</label>
+              <input type="password" class="form-input" id="login-password-confirm"
+                     placeholder="••••••••" autocomplete="new-password">
+            </div>
+
             <button type="submit" class="btn btn-primary" id="btn-submit-auth">Iniciar Sesión</button>
             <div style="text-align:center; margin-top:1rem;">
                <a href="#" id="toggle-auth-mode" style="color:var(--color-primary);text-decoration:none;font-size:0.875rem;">¿No tienes cuenta? Regístrate</a>
@@ -186,27 +192,45 @@ const App = (() => {
     const modeInput = document.getElementById('auth-mode');
     const toggleAuth = document.getElementById('toggle-auth-mode');
     const btnSubmit = document.getElementById('btn-submit-auth');
+    const groupConfirm = document.getElementById('group-confirm-password');
+    const inputConfirm = document.getElementById('login-password-confirm');
+    const errorEl = document.getElementById('login-error');
 
     if (toggleAuth) {
       toggleAuth.addEventListener('click', (e) => {
         e.preventDefault();
+        errorEl.classList.remove('visible'); // Limpiar errores al cambiar
         if (modeInput.value === 'login') {
           modeInput.value = 'register';
           btnSubmit.textContent = 'Crear Cuenta';
           toggleAuth.textContent = '¿Ya tienes cuenta? Inicia sesión';
+          groupConfirm.style.display = 'block';
+          inputConfirm.setAttribute('required', 'true');
         } else {
           modeInput.value = 'login';
           btnSubmit.textContent = 'Iniciar Sesión';
           toggleAuth.textContent = '¿No tienes cuenta? Regístrate';
+          groupConfirm.style.display = 'none';
+          inputConfirm.removeAttribute('required');
         }
       });
     }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      errorEl.classList.remove('visible');
       const email = document.getElementById('login-email').value;
       const password = document.getElementById('login-password').value;
       const isRegister = document.getElementById('auth-mode').value === 'register';
+
+      if (isRegister) {
+        const confirmPassword = inputConfirm.value;
+        if (password !== confirmPassword) {
+          errorEl.textContent = 'Las contraseñas no coinciden';
+          errorEl.classList.add('visible');
+          return;
+        }
+      }
 
       const prevText = btnSubmit.textContent;
 
@@ -229,9 +253,10 @@ const App = (() => {
           modeInput.value = 'login';
           btnSubmit.textContent = 'Iniciar Sesión';
           toggleAuth.textContent = '¿No tienes cuenta? Regístrate';
+          groupConfirm.style.display = 'none';
+          inputConfirm.removeAttribute('required');
         }
       } else {
-        const errorEl = document.getElementById('login-error');
         errorEl.textContent = result.error;
         errorEl.classList.add('visible');
       }
