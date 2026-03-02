@@ -88,9 +88,9 @@ const PedidoService = (() => {
             const iva = calcularIva(subtotal);
             const totalCajas = calcularTotalCajas(calculatedLineas);
 
-            // Usar getUser() directamente (más fiable que AuthService.getCurrentUser())
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('No hay sesión activa. Por favor, inicie sesión de nuevo.');
+            // Usar getSession() directamente (más fiable, no requiere llamada de red)
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session || !session.user) throw new Error('No hay sesión activa. Por favor, inicie sesión de nuevo.');
 
             const pedidoParams = {
                 cliente_id: clienteId,
@@ -99,7 +99,7 @@ const PedidoService = (() => {
                 iva: iva,
                 total: subtotal + iva,
                 total_cajas: totalCajas,
-                user_id: user.id
+                user_id: session.user.id
             };
 
             const { data: pedidoData, error: pedidoError } = await supabase
