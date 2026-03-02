@@ -220,3 +220,97 @@
 .sidebar-overlay.active {
     display: block;
 }
+
+/* ---- Sidebar Search Global ---- */
+.sidebar-search {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+}
+
+.sidebar-search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.sidebar-search-icon {
+    position: absolute;
+    left: var(--spacing-sm);
+    font-size: 0.85rem;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.sidebar-search #global-search-input {
+    width: 100%;
+    padding: var(--spacing-xs) var(--spacing-sm) var(--spacing-xs) 1.8rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-md);
+    color: #fff;
+    font-size: var(--font-size-sm);
+    outline: none;
+    transition: all var(--transition-fast);
+}
+
+.sidebar-search #global-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.sidebar-search #global-search-input:focus {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: var(--color-primary);
+}
+
+.global-search-results {
+    display: none;
+    position: absolute;
+    left: var(--spacing-lg);
+    right: var(--spacing-lg);
+    top: calc(100% + 4px);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-xl);
+    z-index: 300;
+    overflow: hidden;
+}
+
+.global-search-results.active {
+    display: block;
+}
+
+.global-result-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-base);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    border-bottom: 1px solid var(--color-border-light);
+    transition: background var(--transition-fast);
+}
+
+.global-result-item:last-child {
+    border-bottom: none;
+}
+
+.global-result-item:hover {
+    background: var(--color-primary-bg);
+}
+
+.global-result-icon {
+    font-size: 1rem;
+}
+
+.global-result-text {
+    flex: 1;
+    font-weight: var(--font-weight-medium);
+}
+
+.global-result-type {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}

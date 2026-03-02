@@ -97,6 +97,15 @@ const App = (() => {
             </div>
           </nav>
 
+          <!-- Buscador Global -->
+          <div class="sidebar-search" id="sidebar-search-container">
+            <div class="sidebar-search-input-wrap">
+              <span class="sidebar-search-icon">&#x1F50D;</span>
+              <input type="text" id="global-search-input" placeholder="Buscar..." autocomplete="off">
+            </div>
+            <div class="global-search-results" id="global-search-results"></div>
+          </div>
+
           <div class="sidebar-user">
             <div class="sidebar-user-avatar">${(user?.name || 'U')[0]}</div>
             <div class="sidebar-user-info">
@@ -362,6 +371,20 @@ const App = (() => {
     `;
   }
 
+  /**
+   * Renderiza un badge de color según el estado del pedido
+   */
+  function renderEstadoBadge(estado) {
+    const config = {
+      pendiente: { label: 'Pendiente', cls: 'badge-estado-pendiente' },
+      confirmado: { label: 'Confirmado', cls: 'badge-estado-confirmado' },
+      enviado: { label: 'Enviado', cls: 'badge-estado-enviado' },
+      facturado: { label: 'Facturado', cls: 'badge-estado-facturado' }
+    };
+    const { label, cls } = config[estado] || { label: estado, cls: '' };
+    return `<span class="badge-estado ${cls}">${label}</span>`;
+  }
+
   /* ================================================
      CLIENTE DETALLE VIEW (Histórico)
      ================================================ */
@@ -379,6 +402,7 @@ const App = (() => {
                <tr>
                  <th>Nº Pedido</th>
                  <th>Fecha</th>
+                 <th>Estado</th>
                  <th>Productos</th>
                  <th>Total</th>
                  <th>Acciones</th>
@@ -389,6 +413,7 @@ const App = (() => {
                  <tr>
                    <td><strong>${Formatters.escapeHtml(p.numeroPedido)}</strong></td>
                    <td>${Formatters.date(p.fecha)}</td>
+                   <td>${renderEstadoBadge(p.estado)}</td>
                    <td>${p.lineas?.length || 0} líneas</td>
                    <td><strong>${Formatters.currency(p.total)}</strong></td>
                    <td>
@@ -710,6 +735,25 @@ const App = (() => {
                 <span class="label">TOTAL:</span>
                 <span class="value">${Formatters.currency(pedido.total)}</span>
               </div>
+
+              <!-- Selector de Estado -->
+              <div class="order-summary-row" style="margin-top:var(--spacing-lg);flex-direction:column;align-items:flex-start;gap:var(--spacing-xs)">
+                <span class="label">Estado del pedido:</span>
+                <select id="select-estado-pedido" class="form-select" style="width:100%">
+                  <option value="pendiente"  ${pedido.estado === 'pendiente' ? 'selected' : ''}>⏳ Pendiente</option>
+                  <option value="confirmado" ${pedido.estado === 'confirmado' ? 'selected' : ''}>✅ Confirmado</option>
+                  <option value="enviado"    ${pedido.estado === 'enviado' ? 'selected' : ''}>🚚 Enviado</option>
+                  <option value="facturado"  ${pedido.estado === 'facturado' ? 'selected' : ''}>🧾 Facturado</option>
+                </select>
+              </div>
+
+              <!-- Notas Internas -->
+              <div class="order-summary-row" style="flex-direction:column;align-items:flex-start;gap:var(--spacing-xs)">
+                <span class="label">📝 Notas internas:</span>
+                <textarea id="textarea-notas-pedido" class="form-textarea" style="width:100%;min-height:80px;font-size:var(--font-size-sm)"
+                  placeholder="Añade notas sobre este pedido...">${Formatters.escapeHtml(pedido.notas || '')}</textarea>
+                <button class="btn btn-outline btn-sm" id="btn-guardar-notas" style="align-self:flex-end">💾 Guardar notas</button>
+              </div>
             </div>
           </div>
         </div>
@@ -790,6 +834,77 @@ const App = (() => {
         await AuthService.logout();
         navigateTo('login');
         Toast.show('Sesión cerrada');
+      });
+    }
+
+    // Buscador Global
+    const globalSearch = document.getElementById('global-search-input');
+    const globalResults = document.getElementById('global-search-results');
+    if (globalSearch && globalResults) {
+      let debounceTimer = null;
+
+      globalSearch.addEventListener('input', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+          const query = globalSearch.value.trim();
+          if (query.length < 2) {
+            globalResults.classList.remove('active');
+            return;
+          }
+
+          // Buscar clientes y pedidos en paralelo
+          const [clientes, pedidos] = await Promise.all([
+            ClienteService.buscar(query),
+            PedidoService.getAll()
+          ]);
+
+          const pedidosFiltrados = pedidos.filter(p =>
+            p.numeroPedido.toLowerCase().includes(query.toLowerCase())
+          );
+
+          let html = '';
+          clientes.slice(0, 4).forEach(c => {
+            html += `<div class="global-result-item" data-type="cliente" data-id="${c.id}">
+              <span class="global-result-icon">👤</span>
+              <span class="global-result-text">${Formatters.escapeHtml(c.nombre)}</span>
+              <span class="global-result-type">Cliente</span>
+            </div>`;
+          });
+          pedidosFiltrados.slice(0, 4).forEach(p => {
+            html += `<div class="global-result-item" data-type="pedido" data-id="${p.id}" data-cliente-id="${p.clienteId}">
+              <span class="global-result-icon">📦</span>
+              <span class="global-result-text">${Formatters.escapeHtml(p.numeroPedido)}</span>
+              <span class="global-result-type">${Formatters.currency(p.total)}</span>
+            </div>`;
+          });
+
+          if (!html) {
+            html = '<div class="global-result-item" style="color:var(--color-text-muted);justify-content:center">Sin resultados</div>';
+          }
+
+          globalResults.innerHTML = html;
+          globalResults.classList.add('active');
+
+          // Click en resultado
+          globalResults.querySelectorAll('.global-result-item[data-id]').forEach(item => {
+            item.addEventListener('click', () => {
+              globalResults.classList.remove('active');
+              globalSearch.value = '';
+              if (item.dataset.type === 'cliente') {
+                navigateTo('clienteDetalle', { clienteId: item.dataset.id });
+              } else {
+                navigateTo('verPedido', { pedidoId: item.dataset.id, clienteId: item.dataset.clienteId });
+              }
+            });
+          });
+        }, 250);
+      });
+
+      // Cerrar al hacer click fuera
+      document.addEventListener('click', (e) => {
+        if (!globalSearch.contains(e.target) && !globalResults.contains(e.target)) {
+          globalResults.classList.remove('active');
+        }
       });
     }
 
@@ -1375,6 +1490,28 @@ const App = (() => {
 
     document.getElementById('btn-repetir-ver-pedido')?.addEventListener('click', async () => {
       await repeatPedido(currentPedidoId);
+    });
+
+    // Selector de estado — guarda automáticamente al cambiar
+    document.getElementById('select-estado-pedido')?.addEventListener('change', async (e) => {
+      const nuevoEstado = e.target.value;
+      const result = await PedidoService.actualizarEstado(currentPedidoId, nuevoEstado);
+      if (result.success) {
+        Toast.show(`Estado actualizado: ${nuevoEstado}`);
+      } else {
+        Toast.show(result.error, 'error');
+      }
+    });
+
+    // Guardar notas
+    document.getElementById('btn-guardar-notas')?.addEventListener('click', async () => {
+      const notas = document.getElementById('textarea-notas-pedido')?.value || '';
+      const result = await PedidoService.actualizarNotas(currentPedidoId, notas);
+      if (result.success) {
+        Toast.show('Notas guardadas');
+      } else {
+        Toast.show(result.error, 'error');
+      }
     });
   }
 

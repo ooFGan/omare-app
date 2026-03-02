@@ -16,12 +16,13 @@ const PedidoService = (() => {
             id: dbPedido.id,
             clienteId: dbPedido.cliente_id,
             numeroPedido: dbPedido.numero_pedido,
-            fecha: dbPedido.created_at, // O usar fb.fecha si existiera
+            fecha: dbPedido.created_at,
             subtotal: parseFloat(dbPedido.subtotal),
             iva: parseFloat(dbPedido.iva),
             total: parseFloat(dbPedido.total),
             totalCajas: parseInt(dbPedido.total_cajas),
-            estado: 'guardado',
+            estado: dbPedido.estado || 'pendiente',
+            notas: dbPedido.notas || '',
             lineas: (dbPedido.pedido_lineas || []).map(l => ({
                 id: l.id,
                 pedidoId: l.pedido_id,
@@ -95,7 +96,9 @@ const PedidoService = (() => {
                 subtotal: subtotal,
                 iva: iva,
                 total: subtotal + iva,
-                total_cajas: totalCajas
+                total_cajas: totalCajas,
+                estado: 'pendiente',
+                notas: (lineas._notas || '')
             };
 
             const { data: pedidoData, error: pedidoError } = await supabase
@@ -168,10 +171,17 @@ const PedidoService = (() => {
                 if (insertError) throw insertError;
             }
 
-            // Update totals parent
+            // Update totals parent (preserve estado, update notas if provided)
+            const updatePayload = {
+                subtotal, iva,
+                total: subtotal + iva,
+                total_cajas: totalCajas
+            };
+            if (lineas._notas !== undefined) updatePayload.notas = lineas._notas;
+
             const { error: updateError } = await supabase
                 .from('pedidos')
-                .update({ subtotal, iva, total: subtotal + iva, total_cajas: totalCajas })
+                .update(updatePayload)
                 .eq('id', pedidoId);
 
             if (updateError) throw updateError;
@@ -291,10 +301,56 @@ const PedidoService = (() => {
         return `PED-${year}-${String(nextOrderIndex).padStart(4, '0')}`;
     }
 
+    /**
+     * Actualiza solo el estado de un pedido sin tocar sus líneas
+     * @param {string} pedidoId
+     * @param {string} nuevoEstado - pendiente | confirmado | enviado | facturado
+     * @returns {Promise<{ success: boolean, error?: string }>}
+     */
+    async function actualizarEstado(pedidoId, nuevoEstado) {
+        const estadosValidos = ['pendiente', 'confirmado', 'enviado', 'facturado'];
+        if (!estadosValidos.includes(nuevoEstado)) {
+            return { success: false, error: 'Estado no válido' };
+        }
+        try {
+            const { error } = await supabase
+                .from('pedidos')
+                .update({ estado: nuevoEstado })
+                .eq('id', pedidoId);
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Error actualizando estado:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Actualiza solo las notas de un pedido
+     * @param {string} pedidoId
+     * @param {string} notas
+     * @returns {Promise<{ success: boolean, error?: string }>}
+     */
+    async function actualizarNotas(pedidoId, notas) {
+        try {
+            const { error } = await supabase
+                .from('pedidos')
+                .update({ notas })
+                .eq('id', pedidoId);
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Error actualizando notas:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     return {
         getAll,
         crear,
         actualizarLineas,
+        actualizarEstado,
+        actualizarNotas,
         getByClienteId,
         getById,
         repetir,
