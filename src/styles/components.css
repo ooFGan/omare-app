@@ -771,3 +771,58 @@
     align-items: center;
     justify-content: space-between;
 }
+
+/* ---- Mis Datos: Exportar / Importar ---- */
+.datos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--spacing-xl);
+}
+
+/* Zona de arrastrar y soltar archivos */
+.import-drop-zone {
+    border: 2px dashed var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-3xl) var(--spacing-2xl);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    transition: all var(--transition-base);
+    cursor: default;
+    background: var(--color-bg);
+}
+
+.import-drop-zone:hover,
+.import-drop-zone.drag-over {
+    border-color: var(--color-primary);
+    background: var(--color-primary-bg);
+}
+
+.import-drop-zone.drag-over {
+    transform: scale(1.01);
+    box-shadow: 0 0 0 4px rgba(228, 0, 58, 0.1);
+}
+
+.import-drop-icon {
+    font-size: 2.5rem;
+    opacity: 0.5;
+    transition: opacity var(--transition-fast);
+}
+
+.import-drop-zone:hover .import-drop-icon,
+.import-drop-zone.drag-over .import-drop-icon {
+    opacity: 1;
+}
+
+.import-drop-text {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-secondary);
+}
+
+.import-drop-sub {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}

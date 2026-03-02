@@ -10,6 +10,7 @@ const App = (() => {
   let currentPedidoId = null;
   let currentEditingPedidoId = null; // null = crear nuevo, string = editar pedido existente
   let pedidoLineas = []; // Líneas del pedido en edición
+  let _importPreviewClientes = []; // Clientes pendientes de confirmar importación
 
   const CENTRAL_EMAIL = 'pedidos@omare.com';
 
@@ -70,7 +71,8 @@ const App = (() => {
       clienteDetalle: 'Detalle de Cliente',
       nuevoPedido: 'Nuevo Pedido',
       verPedido: 'Ver Pedido',
-      estadisticas: 'Estadísticas'
+      estadisticas: 'Estadísticas',
+      datos: 'Importar / Exportar'
     };
 
     return `
@@ -94,6 +96,10 @@ const App = (() => {
             <div class="sidebar-nav-item ${currentView === 'campanyas' ? 'active' : ''}" data-view="campanyas">
               <span class="nav-icon">📣</span>
               <span>Campañas</span>
+            </div>
+            <div class="sidebar-nav-item ${currentView === 'datos' ? 'active' : ''}" data-view="datos">
+              <span class="nav-icon">📂</span>
+              <span>Mis Datos</span>
             </div>
             <div class="sidebar-nav-item" data-view="catalogo-pdf" id="nav-catalogo">
               <span class="nav-icon">📋</span>
@@ -151,6 +157,7 @@ const App = (() => {
       case 'verPedido': return await renderVerPedidoView();
       case 'estadisticas': return await renderEstadisticasView();
       case 'campanyas': return await renderCampanyasView();
+      case 'datos': return await renderDatosView();
       default: return await renderClientesView();
     }
   }
@@ -964,6 +971,9 @@ const App = (() => {
         break;
       case 'campanyas':
         attachCampanyasEvents();
+        break;
+      case 'datos':
+        attachDatosEvents();
         break;
     }
   }
@@ -2112,6 +2122,432 @@ Equipo OMARE</textarea>
   }
 
   /* ================================================
+     MIS DATOS — Importar / Exportar Clientes
+     ================================================ */
+
+  async function renderDatosView() {
+    const clientes = await ClienteService.getAll();
+
+    return `
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Mis Datos</h1>
+          <p class="page-subtitle">Exporta una copia de seguridad de tus clientes o importa nuevos desde un archivo</p>
+        </div>
+      </div>
+
+      <div class="datos-grid">
+
+        <!-- Exportar -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-header-title">📥 Exportar Clientes</h3>
+          </div>
+          <div class="card-body">
+            <p style="color:var(--color-text-muted);margin-bottom:var(--spacing-md);line-height:1.6">
+              Tienes <strong>${clientes.length} cliente(s)</strong> registrados. Descarga un archivo
+              con todos sus datos (Nombre, Email, Dirección, Teléfono, Observaciones).
+              Puedes usar este mismo archivo para importarlos de nuevo si fuera necesario.
+            </p>
+            <div style="display:flex;gap:var(--spacing-md);flex-wrap:wrap">
+              <button class="btn btn-primary" id="btn-exportar-clientes-excel" ${clientes.length === 0 ? 'disabled' : ''}>
+                📥 Descargar Excel (.xlsx)
+              </button>
+              <button class="btn btn-outline" id="btn-exportar-clientes-csv" ${clientes.length === 0 ? 'disabled' : ''}>
+                📄 Descargar CSV (.csv)
+              </button>
+            </div>
+            ${clientes.length === 0 ? `<p style="margin-top:var(--spacing-md);color:var(--color-text-muted);font-size:var(--font-size-sm)">Crea clientes para poder exportarlos.</p>` : ''}
+          </div>
+        </div>
+
+        <!-- Importar -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-header-title">📤 Importar Clientes</h3>
+          </div>
+          <div class="card-body">
+            <p style="color:var(--color-text-muted);margin-bottom:var(--spacing-md);line-height:1.6">
+              Sube un archivo <strong>.xlsx</strong> o <strong>.csv</strong> con tus clientes.
+              Los que ya existan (mismo nombre) serán omitidos; los nuevos se crearán automáticamente.
+            </p>
+            <div class="import-drop-zone" id="import-drop-zone">
+              <div class="import-drop-icon">📁</div>
+              <div class="import-drop-text">Arrastra tu archivo aquí</div>
+              <div class="import-drop-sub">o</div>
+              <label class="btn btn-outline" style="cursor:pointer;margin-top:var(--spacing-sm)">
+                Seleccionar archivo
+                <input type="file" id="input-import-file" accept=".xlsx,.csv" style="display:none">
+              </label>
+              <div style="font-size:var(--font-size-xs);color:var(--color-text-muted);margin-top:var(--spacing-md)">
+                Columnas requeridas: <strong>Nombre</strong> · opcionales: Email, Dirección, Teléfono, Observaciones
+              </div>
+            </div>
+            <div id="import-results" style="margin-top:var(--spacing-lg)"></div>
+          </div>
+        </div>
+
+      </div>
+    `;
+  }
+
+  function attachDatosEvents() {
+    // Exportar Excel
+    document.getElementById('btn-exportar-clientes-excel')?.addEventListener('click', async () => {
+      await exportarClientesExcel();
+    });
+
+    // Exportar CSV
+    document.getElementById('btn-exportar-clientes-csv')?.addEventListener('click', async () => {
+      await exportarClientesCsv();
+    });
+
+    // Input de archivo
+    const fileInput = document.getElementById('input-import-file');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) processImportFile(file);
+      });
+    }
+
+    // Drag & Drop
+    const dropZone = document.getElementById('import-drop-zone');
+    if (dropZone) {
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+      });
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) processImportFile(file);
+      });
+    }
+  }
+
+  /**
+   * Exporta todos los clientes a Excel (.xlsx)
+   */
+  async function exportarClientesExcel() {
+    if (!window.XLSX) {
+      Toast.show('Librería Excel no disponible', 'error');
+      return;
+    }
+    const clientes = await ClienteService.getAll();
+    if (clientes.length === 0) return;
+
+    const filas = clientes.map(c => ({
+      'Nombre': c.nombre || '',
+      'Email': c.email || '',
+      'Dirección': c.direccion || '',
+      'Teléfono': c.telefono || '',
+      'Observaciones': c.observaciones || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(filas);
+    ws['!cols'] = [{ wch: 30 }, { wch: 30 }, { wch: 40 }, { wch: 18 }, { wch: 50 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+
+    const fecha = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `clientes_OMARE_${fecha}.xlsx`);
+    Toast.show(`${clientes.length} cliente(s) exportados`);
+    localStorage.setItem('omare_last_backup_reminder', Date.now().toString());
+  }
+
+  /**
+   * Exporta todos los clientes a CSV (.csv)
+   */
+  async function exportarClientesCsv() {
+    const clientes = await ClienteService.getAll();
+    if (clientes.length === 0) return;
+
+    const escapeCsv = (val) => `"${(val || '').replace(/"/g, '""')}"`;
+    const headers = ['Nombre', 'Email', 'Dirección', 'Teléfono', 'Observaciones'];
+    const rows = clientes.map(c => [
+      escapeCsv(c.nombre),
+      escapeCsv(c.email),
+      escapeCsv(c.direccion),
+      escapeCsv(c.telefono),
+      escapeCsv(c.observaciones)
+    ].join(','));
+
+    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n'); // BOM para Excel
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const fecha = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `clientes_OMARE_${fecha}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+    Toast.show(`${clientes.length} cliente(s) exportados en CSV`);
+    localStorage.setItem('omare_last_backup_reminder', Date.now().toString());
+  }
+
+  /**
+   * Lee el archivo subido (.xlsx o .csv) y muestra la previsualización
+   */
+  async function processImportFile(file) {
+    const resultsEl = document.getElementById('import-results');
+    if (!resultsEl) return;
+
+    resultsEl.innerHTML = `<div style="text-align:center;padding:var(--spacing-xl)"><div class="spinner"></div><p style="color:var(--color-text-muted);margin-top:var(--spacing-md)">Leyendo archivo...</p></div>`;
+
+    try {
+      let rows = [];
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if (ext === 'csv') {
+        const text = await file.text();
+        rows = parseCsvParaImport(text);
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        if (!window.XLSX) { Toast.show('Librería Excel no disponible', 'error'); return; }
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      } else {
+        Toast.show('Formato no soportado. Usa .xlsx o .csv', 'error');
+        resultsEl.innerHTML = '';
+        return;
+      }
+
+      if (rows.length === 0) {
+        resultsEl.innerHTML = `<div class="empty-state"><div class="empty-state-title">El archivo está vacío o no tiene datos reconocibles</div></div>`;
+        return;
+      }
+
+      showImportPreview(rows, resultsEl);
+
+    } catch (err) {
+      console.error('[Import] Error leyendo archivo:', err);
+      resultsEl.innerHTML = `<div style="color:var(--color-danger);padding:var(--spacing-md)">❌ Error al leer el archivo: ${Formatters.escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  /**
+   * Parser CSV simple que soporta campos entrecomillados y BOM
+   */
+  function parseCsvParaImport(text) {
+    // Eliminar BOM si existe
+    const clean = text.replace(/^\uFEFF/, '');
+    const lines = clean.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) return [];
+
+    const parseRow = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+          else { inQuotes = !inQuotes; }
+        } else if (ch === ',' && !inQuotes) {
+          result.push(current.trim()); current = '';
+        } else { current += ch; }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const headers = parseRow(lines[0]).map(h => h.toLowerCase().trim());
+    return lines.slice(1).map(line => {
+      const vals = parseRow(line);
+      const row = {};
+      headers.forEach((h, i) => { row[h] = vals[i] || ''; });
+      return row;
+    });
+  }
+
+  /**
+   * Normaliza columnas del archivo (acepta variantes en español/inglés)
+   */
+  function normalizarFilaCliente(row) {
+    const get = (...keys) => {
+      for (const k of keys) {
+        const found = Object.keys(row).find(rk => rk.toLowerCase().trim() === k.toLowerCase());
+        if (found && row[found]) return row[found].trim();
+      }
+      return '';
+    };
+    return {
+      nombre: get('nombre', 'name', 'client', 'cliente'),
+      email: get('email', 'correo', 'mail', 'e-mail'),
+      direccion: get('dirección', 'direccion', 'address', 'direccón'),
+      telefono: get('teléfono', 'telefono', 'phone', 'tel'),
+      observaciones: get('observaciones', 'notes', 'notas', 'comentarios')
+    };
+  }
+
+  /**
+   * Muestra previsualización de clientes a importar con botón de confirmación
+   */
+  function showImportPreview(rows, resultsEl) {
+    const clientes = rows.map(normalizarFilaCliente).filter(c => c.nombre.length > 0);
+    if (clientes.length === 0) {
+      resultsEl.innerHTML = `<div class="empty-state">
+        <div class="empty-state-icon">⚠️</div>
+        <div class="empty-state-title">No se encontraron clientes válidos</div>
+        <div class="empty-state-desc">Asegúrate de que el archivo tiene una columna "Nombre"</div>
+      </div>`;
+      return;
+    }
+
+    _importPreviewClientes = clientes;
+
+    resultsEl.innerHTML = `
+      <div class="card" style="margin-top:0">
+        <div class="card-header">
+          <h3 class="card-header-title">Vista previa — ${clientes.length} cliente(s) encontrado(s)</h3>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="table-container" style="max-height:220px;overflow-y:auto">
+            <table class="data-table">
+              <thead><tr><th>Nombre</th><th>Email</th><th>Teléfono</th></tr></thead>
+              <tbody>
+                ${clientes.slice(0, 15).map(c => `
+                  <tr>
+                    <td>${Formatters.escapeHtml(c.nombre)}</td>
+                    <td>${Formatters.escapeHtml(c.email)}</td>
+                    <td>${Formatters.escapeHtml(c.telefono)}</td>
+                  </tr>
+                `).join('')}
+                ${clientes.length > 15 ? `<tr><td colspan="3" style="text-align:center;color:var(--color-text-muted)">... y ${clientes.length - 15} más</td></tr>` : ''}
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:var(--spacing-lg);display:flex;gap:var(--spacing-md);justify-content:flex-end">
+            <button class="btn btn-ghost" id="btn-cancelar-import">Cancelar</button>
+            <button class="btn btn-primary" id="btn-confirmar-import">✓ Importar ${clientes.length} cliente(s)</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-cancelar-import')?.addEventListener('click', () => {
+      resultsEl.innerHTML = '';
+      _importPreviewClientes = [];
+      const fi = document.getElementById('input-import-file');
+      if (fi) fi.value = '';
+    });
+
+    document.getElementById('btn-confirmar-import')?.addEventListener('click', async () => {
+      await executeImport(_importPreviewClientes, resultsEl);
+    });
+  }
+
+  /**
+   * Crea los clientes nuevos, omitiendo los que ya existen por nombre
+   */
+  async function executeImport(clientes, resultsEl) {
+    resultsEl.innerHTML = `<div style="text-align:center;padding:var(--spacing-xl)"><div class="spinner"></div><p style="color:var(--color-text-muted);margin-top:var(--spacing-md)">Importando ${clientes.length} clientes...</p></div>`;
+
+    const existentes = await ClienteService.getAll();
+    const nombresExistentes = new Set(existentes.map(c => c.nombre.toLowerCase().trim()));
+
+    const nuevos = clientes.filter(c => !nombresExistentes.has(c.nombre.toLowerCase().trim()));
+    const omitidos = clientes.length - nuevos.length;
+
+    let creados = 0;
+    let errores = 0;
+    for (const cliente of nuevos) {
+      const result = await ClienteService.crear(cliente);
+      if (result.success) { creados++; } else { errores++; }
+    }
+
+    _importPreviewClientes = [];
+
+    resultsEl.innerHTML = `
+      <div class="card" style="margin-top:0">
+        <div class="card-body">
+          <div style="font-size:var(--font-size-lg);font-weight:var(--font-weight-semibold);margin-bottom:var(--spacing-md)">
+            ✅ Importación completada
+          </div>
+          <div style="display:flex;gap:var(--spacing-xl);margin-bottom:var(--spacing-lg)">
+            <div><strong style="font-size:var(--font-size-xl)">${creados}</strong><br><span style="color:var(--color-text-muted);font-size:var(--font-size-sm)">creados</span></div>
+            <div><strong style="font-size:var(--font-size-xl)">${omitidos}</strong><br><span style="color:var(--color-text-muted);font-size:var(--font-size-sm)">ya existían</span></div>
+            ${errores > 0 ? `<div><strong style="font-size:var(--font-size-xl);color:var(--color-danger)">${errores}</strong><br><span style="color:var(--color-text-muted);font-size:var(--font-size-sm)">errores</span></div>` : ''}
+          </div>
+          <button class="btn btn-outline" id="btn-ir-clientes-import">Ir a Clientes</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-ir-clientes-import')?.addEventListener('click', () => navigateTo('clientes'));
+    Toast.show(`Importación: ${creados} cliente(s) creados`);
+  }
+
+  /* ================================================
+     RECORDATORIO MENSUAL DE BACKUP
+     ================================================ */
+
+  /**
+   * Comprueba si han pasado ≥30 días desde el último recordatorio.
+   * Si es así y hay clientes, muestra el modal de backup.
+   */
+  async function checkMonthlyBackupReminder() {
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    const last = parseInt(localStorage.getItem('omare_last_backup_reminder') || '0');
+    if (Date.now() - last < THIRTY_DAYS_MS) return;
+
+    const clientes = await ClienteService.getAll();
+    if (clientes.length === 0) return;
+
+    showBackupReminderModal(clientes.length);
+  }
+
+  function showBackupReminderModal(totalClientes) {
+    // Evitar duplicados si se llama varias veces
+    if (document.getElementById('modal-backup-reminder')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'modal-backup-reminder';
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:440px">
+        <div class="modal-header">
+          <h2 class="modal-title">🔔 Recordatorio mensual</h2>
+        </div>
+        <div class="modal-body">
+          <p style="color:var(--color-text-muted);line-height:1.6">
+            Ha pasado más de un mes desde tu última copia de seguridad.
+            Tienes <strong>${totalClientes} cliente(s)</strong> registrados.
+          </p>
+          <p style="color:var(--color-text-muted);line-height:1.6;margin-top:var(--spacing-md)">
+            ¿Quieres descargar una copia actualizada de seguridad de todos tus clientes?
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="btn-reminder-no">No, gracias</button>
+          <button class="btn btn-primary" id="btn-reminder-si">📥 Sí, descargar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => {
+      modal.remove();
+      localStorage.setItem('omare_last_backup_reminder', Date.now().toString());
+    };
+
+    document.getElementById('btn-reminder-no')?.addEventListener('click', close);
+    document.getElementById('btn-reminder-si')?.addEventListener('click', async () => {
+      close();
+      await exportarClientesExcel();
+    });
+  }
+
+  /* ================================================
      INICIALIZACIÓN
      ================================================ */
 
@@ -2126,6 +2562,8 @@ Equipo OMARE</textarea>
     // Verificar autenticación
     if (AuthService.isAuthenticated()) {
       navigateTo('clientes');
+      // Recordatorio mensual de copia de seguridad (no bloquea la UI)
+      checkMonthlyBackupReminder();
     } else {
       navigateTo('login');
     }
