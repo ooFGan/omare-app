@@ -1,4 +1,4 @@
-/**
+﻿/**
  * app.js - Aplicación principal OMARE Proformas
  * Responsabilidad: enrutamiento SPA, renderizado de vistas y coordinación entre servicios
  */
@@ -8,6 +8,7 @@ const App = (() => {
   let currentView = 'login';
   let currentClienteId = null;
   let currentPedidoId = null;
+  let currentEditingPedidoId = null; // null = crear nuevo, string = editar pedido existente
   let pedidoLineas = []; // Líneas del pedido en edición
 
   const CENTRAL_EMAIL = 'pedidos@omare.com';
@@ -393,7 +394,8 @@ const App = (() => {
                    <td>
                      <div class="cell-actions">
                        <button class="btn btn-sm btn-ghost" data-action="ver-pedido" data-pedido-id="${p.id}" title="Ver">👁️</button>
-                       <button class="btn btn-sm btn-ghost" data-action="pdf-pedido" data-pedido-id="${p.id}" title="PDF">📄</button>
+                       <button class="btn btn-sm btn-ghost" data-action="editar-pedido" data-pedido-id="${p.id}" title="Editar">&#x270F;&#xFE0F;</button>
+                        <button class="btn btn-sm btn-ghost" data-action="pdf-pedido" data-pedido-id="${p.id}" title="PDF">📄</button>
                        <button class="btn btn-sm btn-ghost" data-action="repetir-pedido" data-pedido-id="${p.id}" title="Repetir">🔄</button>
                        <button class="btn btn-sm btn-danger" data-action="eliminar-pedido" data-pedido-id="${p.id}" title="Eliminar">🗑️</button>
                      </div>
@@ -479,6 +481,7 @@ const App = (() => {
      ================================================ */
 
   async function renderNuevoPedidoView() {
+    const isEditMode = currentEditingPedidoId !== null;
     const cliente = await ClienteService.getById(currentClienteId);
     if (!cliente) return '<div class="empty-state"><div class="empty-state-title">Seleccione un cliente</div></div>';
 
@@ -488,14 +491,14 @@ const App = (() => {
     return `
       <!-- Barra superior del pedido -->
       <div class="pedido-top-bar">
-        <div class="pedido-top-bar-title">OMARE - Proforma de Pedidos</div>
+        <div class="pedido-top-bar-title">${isEditMode ? '✏️ Editando Pedido' : 'OMARE - Proforma de Pedidos'}</div>
         <div class="pedido-top-bar-actions">
           <button class="btn btn-outline" id="btn-abrir-catalogo">
             📋 <span class="btn-text">Abrir Catálogo</span>
           </button>
-          <button class="btn btn-success" id="btn-generar-pdf" ${pedidoLineas.length === 0 ? 'disabled' : ''}>
+          ${!isEditMode ? `<button class="btn btn-success" id="btn-generar-pdf" ${pedidoLineas.length === 0 ? 'disabled' : ''}>
             📄 <span class="btn-text">Generar Pedido PDF</span>
-          </button>
+          </button>` : ''}
         </div>
       </div>
 
@@ -578,7 +581,7 @@ const App = (() => {
             </div>
             <div class="order-summary-actions">
               <button class="btn btn-primary btn-lg" id="btn-guardar-pedido" ${pedidoLineas.length === 0 ? 'disabled' : ''}>
-                💾 Guardar Pedido
+                ${isEditMode ? '✏️ Guardar Cambios' : '💾 Guardar Pedido'}
               </button>
               <button class="btn btn-ghost" id="btn-cancelar-pedido">← Volver al Cliente</button>
             </div>
@@ -639,10 +642,11 @@ const App = (() => {
           <h1 class="page-title" style="margin-top:var(--spacing-sm)">${Formatters.escapeHtml(pedido.numeroPedido)}</h1>
           <p class="page-subtitle">📅 ${Formatters.date(pedido.fecha)} · 👤 ${Formatters.escapeHtml(cliente?.nombre || 'Sin cliente')}</p>
         </div>
-        <div style="display:flex;gap:var(--spacing-md)">
+        <div style="display:flex;gap:var(--spacing-md);flex-wrap:wrap">
           <button class="btn btn-outline" id="btn-email-cliente" data-pedido-id="${pedido.id}">✉️ Enviar al Cliente</button>
           <button class="btn btn-outline" id="btn-email-central" data-pedido-id="${pedido.id}">🏢 Enviar a Central</button>
           <button class="btn btn-outline" id="btn-pdf-ver-pedido" data-pedido-id="${pedido.id}">📄 Descargar PDF</button>
+          <button class="btn btn-warning" id="btn-editar-pedido" data-pedido-id="${pedido.id}">✏️ Editar Pedido</button>
           <button class="btn btn-primary" id="btn-repetir-ver-pedido" data-pedido-id="${pedido.id}">🔄 Repetir Pedido</button>
         </div>
       </div>
@@ -944,6 +948,9 @@ const App = (() => {
           case 'ver-pedido':
             navigateTo('verPedido', { pedidoId });
             break;
+          case 'editar-pedido':
+            await startEditPedido(pedidoId);
+            break;
           case 'pdf-pedido':
             await generatePdfForPedido(pedidoId);
             break;
@@ -1123,6 +1130,7 @@ const App = (() => {
     document.getElementById('btn-cancelar-pedido')?.addEventListener('click', () => {
       if (pedidoLineas.length > 0 && !confirm('¿Desea salir sin guardar?')) return;
       pedidoLineas = [];
+      currentEditingPedidoId = null;
       navigateTo('clienteDetalle');
     });
   }
@@ -1197,6 +1205,11 @@ const App = (() => {
       return;
     }
 
+    if (currentEditingPedidoId) {
+      await updatePedido();
+      return;
+    }
+
     const result = await PedidoService.crear(currentClienteId, pedidoLineas);
     if (result.success) {
       Toast.show(`Pedido ${result.pedido.numeroPedido} guardado`);
@@ -1213,6 +1226,11 @@ const App = (() => {
       return;
     }
 
+    if (currentEditingPedidoId) {
+      await updatePedido();
+      return;
+    }
+
     const result = await PedidoService.crear(currentClienteId, pedidoLineas);
     if (result.success) {
       const cliente = await ClienteService.getById(currentClienteId);
@@ -1220,6 +1238,39 @@ const App = (() => {
       await PdfGenerator.generarPedidoPdf(result.pedido, cliente);
       pedidoLineas = [];
       navigateTo('clienteDetalle');
+    } else {
+      Toast.show(result.error, 'error');
+    }
+  }
+
+  /**
+   * Carga un pedido existente en el formulario de edición
+   * @param {string} pedidoId
+   */
+  async function startEditPedido(pedidoId) {
+    const pedido = await PedidoService.getById(pedidoId);
+    if (!pedido) {
+      Toast.show('No se pudo cargar el pedido', 'error');
+      return;
+    }
+    currentEditingPedidoId = pedidoId;
+    currentClienteId = pedido.clienteId;
+    // Cargar las líneas existentes en el estado de edición
+    pedidoLineas = pedido.lineas.map(l => ({ ...l }));
+    navigateTo('nuevoPedido');
+  }
+
+  /**
+   * Guarda los cambios de un pedido existente
+   */
+  async function updatePedido() {
+    const result = await PedidoService.actualizarLineas(currentEditingPedidoId, pedidoLineas);
+    if (result.success) {
+      Toast.show(`Pedido ${result.pedido.numeroPedido} actualizado`);
+      const pedidoEditadoId = currentEditingPedidoId;
+      pedidoLineas = [];
+      currentEditingPedidoId = null;
+      navigateTo('verPedido', { pedidoId: pedidoEditadoId });
     } else {
       Toast.show(result.error, 'error');
     }
@@ -1296,6 +1347,10 @@ const App = (() => {
 
     document.getElementById('btn-pdf-ver-pedido')?.addEventListener('click', async () => {
       await generatePdfForPedido(currentPedidoId);
+    });
+
+    document.getElementById('btn-editar-pedido')?.addEventListener('click', async () => {
+      await startEditPedido(currentPedidoId);
     });
 
     document.getElementById('btn-repetir-ver-pedido')?.addEventListener('click', async () => {
