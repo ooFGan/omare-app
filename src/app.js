@@ -12,7 +12,8 @@ const App = (() => {
   let pedidoLineas = []; // Líneas del pedido en edición
   let _importPreviewClientes = []; // Clientes pendientes de confirmar importación
 
-  const CENTRAL_EMAIL = 'pedidos@omare.com';
+  // Correos de Central: se muestra un selector al hacer clic en "Enviar a Central"
+  const CENTRAL_EMAILS = ['pedidos@omare.com', 'ventas@omare.com'];
 
   /* ================================================
      ROUTER / NAVEGACIÓN
@@ -1467,13 +1468,13 @@ const App = (() => {
     await PdfGenerator.generarPedidoPdf(pedido, cliente || { nombre: 'Sin cliente' });
   }
 
-  async function enviarPedidoPorEmail(pedidoId, tipo = 'cliente') {
+  async function enviarPedidoPorEmail(pedidoId, tipo = 'cliente', customCentralEmail = null) {
     const pedido = await PedidoService.getById(pedidoId);
     if (!pedido) return;
     const cliente = await ClienteService.getById(pedido.clienteId);
 
     const isCentral = tipo === 'central';
-    const recipient = isCentral ? CENTRAL_EMAIL : (cliente?.email || '');
+    const recipient = isCentral ? (customCentralEmail || CENTRAL_EMAILS[0]) : (cliente?.email || '');
     const subject = isCentral
       ? `NUEVO PEDIDO: ${pedido.numeroPedido} - ${cliente?.nombre || 'S/N'}`
       : `Proforma de Pedido ${pedido.numeroPedido} - OMARE`;
@@ -1507,6 +1508,56 @@ const App = (() => {
     Toast.show(`Abriendo correo para ${isCentral ? 'Central' : 'Cliente'}...`);
   }
 
+  /**
+   * Muestra un modal para elegir a cuál correo de Central se envía el pedido
+   * @param {string} pedidoId
+   */
+  function showCentralEmailPickerModal(pedidoId) {
+    const existing = document.getElementById('modal-central-email');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'modal-central-email';
+    modal.className = 'modal-overlay active';
+    modal.innerHTML = `
+      <div class="modal" style="max-width:380px">
+        <div class="modal-header">
+          <h2 class="modal-title">🏢 Enviar a Central</h2>
+          <button class="modal-close" id="modal-central-close">✕</button>
+        </div>
+        <div class="modal-body" style="gap:var(--spacing-md)">
+          <p style="color:var(--color-text-muted);font-size:var(--font-size-sm);margin-bottom:var(--spacing-xs)">
+            ¿A qué correo de Central envías este pedido?
+          </p>
+          ${CENTRAL_EMAILS.map(email => `
+            <button class="central-email-option" data-email="${email}">
+              <span style="font-size:1.2rem">📬</span>
+              <span>${email}</span>
+            </button>
+          `).join('')}
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="btn-central-cancel">Cancelar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    document.getElementById('modal-central-close')?.addEventListener('click', close);
+    document.getElementById('btn-central-cancel')?.addEventListener('click', close);
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+    modal.querySelectorAll('.central-email-option').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const selectedEmail = btn.dataset.email;
+        close();
+        await enviarPedidoPorEmail(pedidoId, 'central', selectedEmail);
+      });
+    });
+  }
+
   async function repeatPedido(pedidoId) {
     const result = await PedidoService.repetir(pedidoId);
     if (result.success) {
@@ -1527,8 +1578,8 @@ const App = (() => {
       await enviarPedidoPorEmail(currentPedidoId, 'cliente');
     });
 
-    document.getElementById('btn-email-central')?.addEventListener('click', async () => {
-      await enviarPedidoPorEmail(currentPedidoId, 'central');
+    document.getElementById('btn-email-central')?.addEventListener('click', () => {
+      showCentralEmailPickerModal(currentPedidoId);
     });
 
     document.getElementById('btn-pdf-ver-pedido')?.addEventListener('click', async () => {

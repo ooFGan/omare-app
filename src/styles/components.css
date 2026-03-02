@@ -826,3 +826,28 @@
     font-size: var(--font-size-sm);
     color: var(--color-text-muted);
 }
+
+/* ---- Modal selector correo de Central ---- */
+.central-email-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-base);
+    width: 100%;
+    padding: var(--spacing-base) var(--spacing-lg);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+}
+
+.central-email-option:hover {
+    border-color: var(--color-primary);
+    background: var(--color-primary-bg);
+    color: var(--color-primary);
+    transform: translateX(4px);
+}
