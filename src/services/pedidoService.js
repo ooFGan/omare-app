@@ -88,8 +88,9 @@ const PedidoService = (() => {
             const iva = calcularIva(subtotal);
             const totalCajas = calcularTotalCajas(calculatedLineas);
 
-            const user = AuthService.getCurrentUser();
-            if (!user) throw new Error('Usuario no autenticado');
+            // Usar getUser() directamente (más fiable que AuthService.getCurrentUser())
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('No hay sesión activa. Por favor, inicie sesión de nuevo.');
 
             const pedidoParams = {
                 cliente_id: clienteId,

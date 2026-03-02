@@ -34,12 +34,19 @@ const ClienteService = (() => {
             return { success: false, error: 'El nombre del cliente es obligatorio' };
         }
 
+        // Obtener el usuario actual directamente del SDK para garantizar que el ID esté fresco
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            return { success: false, error: 'No hay sesión activa. Por favor, inicie sesión de nuevo.' };
+        }
+
         const clienteParams = {
             nombre: dataObj.nombre.trim(),
             email: (dataObj.email || '').trim(),
             direccion: (dataObj.direccion || '').trim(),
             telefono: (dataObj.telefono || '').trim(),
-            observaciones: (dataObj.observaciones || '').trim()
+            observaciones: (dataObj.observaciones || '').trim(),
+            user_id: user.id
         };
 
         try {
