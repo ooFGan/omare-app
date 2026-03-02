@@ -91,6 +91,10 @@ const App = (() => {
               <span class="nav-icon">📊</span>
               <span>Estadísticas</span>
             </div>
+            <div class="sidebar-nav-item ${currentView === 'campanyas' ? 'active' : ''}" data-view="campanyas">
+              <span class="nav-icon">📣</span>
+              <span>Campañas</span>
+            </div>
             <div class="sidebar-nav-item" data-view="catalogo-pdf" id="nav-catalogo">
               <span class="nav-icon">📋</span>
               <span>Catálogo PDF</span>
@@ -146,6 +150,7 @@ const App = (() => {
       case 'nuevoPedido': return await renderNuevoPedidoView();
       case 'verPedido': return await renderVerPedidoView();
       case 'estadisticas': return await renderEstadisticasView();
+      case 'campanyas': return await renderCampanyasView();
       default: return await renderClientesView();
     }
   }
@@ -454,8 +459,11 @@ const App = (() => {
 
       <div class="card">
         <div class="card-header">
-          <h3 class="card-header-title">Histórico de Pedidos</h3>
-          <span class="badge badge-primary">${pedidos.length}</span>
+          <div style="display:flex;align-items:center;gap:var(--spacing-md)">
+            <h3 class="card-header-title">Histórico de Pedidos</h3>
+            <span class="badge badge-primary">${pedidos.length}</span>
+          </div>
+          ${pedidos.length > 0 ? `<button class="btn btn-outline btn-sm" id="btn-exportar-excel-cliente">📊 Exportar Excel</button>` : ''}
         </div>
         <div class="card-body" style="padding:0">
           ${pedidosHtml}
@@ -595,6 +603,11 @@ const App = (() => {
               <div class="order-summary-row">
                 <span class="label">Base Imponible:</span>
                 <span class="value" id="summary-subtotal">${Formatters.currency(totals.subtotal)}</span>
+              </div>
+              <div class="order-summary-row" style="align-items:center">
+                <span class="label">Descuento (%):</span>
+                <input type="number" id="input-descuento" min="0" max="100" step="0.5"
+                  value="0" style="width:70px;text-align:right;padding:2px 6px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:var(--font-size-sm)">
               </div>
               <div class="order-summary-row">
                 <span class="label">IVA (21%):</span>
@@ -945,6 +958,9 @@ const App = (() => {
       case 'estadisticas':
         attachEstadisticasEvents();
         break;
+      case 'campanyas':
+        attachCampanyasEvents();
+        break;
     }
   }
 
@@ -1101,6 +1117,14 @@ const App = (() => {
             break;
         }
       });
+    });
+
+    // Exportar pedidos del cliente a Excel
+    document.getElementById('btn-exportar-excel-cliente')?.addEventListener('click', async () => {
+      const cliente = await ClienteService.getById(currentClienteId);
+      const pedidos = await PedidoService.getByClienteId(currentClienteId);
+      ExcelExporter.exportarPedidos(pedidos, `pedidos_${(cliente?.nombre || 'cliente').replace(/\s+/g, '_')}`, cliente);
+      Toast.show('Exportando Excel...');
     });
   }
 
@@ -1786,6 +1810,287 @@ const App = (() => {
           attachEstadisticasEvents();
         }
       });
+    });
+  }
+
+
+  /* ================================================
+     CAMPAÑAS VIEW — Ofertas y Recordatorios
+     ================================================ */
+
+  async function renderCampanyasView() {
+    const clientes = await ClienteService.getAll();
+    const pedidos = await PedidoService.getAll();
+
+    // Calcular última compra por cliente
+    const ultimaCompraPor = {};
+    pedidos.forEach(p => {
+      const prev = ultimaCompraPor[p.clienteId];
+      const fecha = new Date(p.fecha);
+      if (!prev || fecha > prev) ultimaCompraPor[p.clienteId] = fecha;
+    });
+
+    const ahora = new Date();
+    const clientesConActividad = clientes.map(c => ({
+      ...c,
+      ultimaCompra: ultimaCompraPor[c.id] || null,
+      diasInactivo: ultimaCompraPor[c.id]
+        ? Math.floor((ahora - ultimaCompraPor[c.id]) / 86400000)
+        : 9999
+    }));
+
+    const clientesHtml = clientesConActividad.map(c => `
+      <div class="cliente-seleccion-item" data-cliente-id="${c.id}">
+        <input type="checkbox" class="chk-cliente-oferta" data-email="${Formatters.escapeHtml(c.email || '')}" data-nombre="${Formatters.escapeHtml(c.nombre)}">
+        <span class="cliente-seleccion-nombre">${Formatters.escapeHtml(c.nombre)}</span>
+        <span class="cliente-seleccion-meta">${c.email ? Formatters.escapeHtml(c.email) : '<em>Sin email</em>'}</span>
+      </div>
+    `).join('');
+
+    return `
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">📣 Campañas</h1>
+          <p class="page-subtitle">Comunica ofertas o envía recordatorios a tus clientes</p>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="campanyas-tabs">
+        <button class="campanya-tab active" data-tab="ofertas">🏷️ Ofertas & Promociones</button>
+        <button class="campanya-tab" data-tab="recordatorios">🔔 Recordatorios de Inactividad</button>
+      </div>
+
+      <!-- ===== TAB OFERTAS ===== -->
+      <div class="campanya-panel active" id="tab-ofertas">
+        <div class="campanya-grid">
+
+          <!-- Columna izquierda: Selección de clientes -->
+          <div class="campanya-card">
+            <div class="campanya-card-title">👤 Seleccionar destinatarios</div>
+            <div class="seleccion-actions">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="chk-todos-oferta"> Seleccionar todos
+              </label>
+              <span id="oferta-seleccionados-count">0 seleccionados</span>
+            </div>
+            <div class="clientes-seleccion" id="lista-clientes-oferta">
+              ${clientesHtml}
+            </div>
+          </div>
+
+          <!-- Columna derecha: Redactar email -->
+          <div class="campanya-card">
+            <div class="campanya-card-title">✉️ Redactar email</div>
+            <div class="form-group">
+              <label class="form-label">Asunto</label>
+              <input type="text" class="form-input" id="oferta-asunto"
+                value="🏷️ Oferta especial OMARE — ¡No te la pierdas!">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cuerpo del mensaje</label>
+              <textarea class="email-preview" id="oferta-cuerpo">Buenos días,
+
+Nos complace comunicarle que tenemos una oferta especial disponible para usted.
+
+[Describa aquí la oferta, artículos en promoción, precios especiales, etc.]
+
+Puede consultar nuestro catálogo completo y descargarlo desde:
+https://www.omare.com/wp-content/uploads/2025/01/CATALOGO-OMARE_2025.pdf
+
+Estamos a su disposición para cualquier consulta.
+
+Un saludo,
+Equipo OMARE</textarea>
+            </div>
+            <button class="btn btn-primary" id="btn-enviar-oferta" style="width:100%">
+              📤 Abrir correo con destinatarios seleccionados
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== TAB RECORDATORIOS ===== -->
+      <div class="campanya-panel" id="tab-recordatorios">
+        <div class="campanya-grid">
+
+          <!-- Columna izquierda: Filtro + clientes inactivos -->
+          <div class="campanya-card">
+            <div class="campanya-card-title">⏱️ Filtrar clientes inactivos</div>
+            <div class="inactivity-filter">
+              <button class="inactivity-btn active" data-dias="7">1 semana</button>
+              <button class="inactivity-btn" data-dias="30">1 mes</button>
+              <button class="inactivity-btn" data-dias="90">+3 meses</button>
+              <button class="inactivity-btn" data-dias="9999">Sin compras</button>
+            </div>
+            <div class="seleccion-actions">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="chk-todos-recordatorio"> Seleccionar todos
+              </label>
+              <span id="recordatorio-seleccionados-count">0 seleccionados</span>
+            </div>
+            <div class="clientes-seleccion" id="lista-clientes-recordatorio">
+              <div class="clientes-empty">Selecciona un filtro para ver clientes</div>
+            </div>
+          </div>
+
+          <!-- Columna derecha: Plantilla recordatorio -->
+          <div class="campanya-card">
+            <div class="campanya-card-title">✉️ Plantilla de recordatorio</div>
+            <div class="form-group">
+              <label class="form-label">Asunto</label>
+              <input type="text" class="form-input" id="recordatorio-asunto"
+                value="OMARE — Le echamos de menos 👋">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cuerpo del mensaje</label>
+              <textarea class="email-preview" id="recordatorio-cuerpo">Buenos días,
+
+En OMARE seguimos a su disposición y nos gustaría recordarle que estamos aquí para atenderle.
+
+Consulte nuestro catálogo con las últimas novedades y descárguelo desde:
+https://www.omare.com/wp-content/uploads/2025/01/CATALOGO-OMARE_2025.pdf
+
+No dude en contactarnos para realizar su próximo pedido. Estaremos encantados de atenderle.
+
+Un saludo,
+Equipo OMARE</textarea>
+            </div>
+            <button class="btn btn-primary" id="btn-enviar-recordatorio" style="width:100%">
+              📤 Enviar recordatorio a seleccionados
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /* ---- Campañas Events ---- */
+  function attachCampanyasEvents() {
+    // ---- Tabs ----
+    document.querySelectorAll('.campanya-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.campanya-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.campanya-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`tab-${tab.dataset.tab}`)?.classList.add('active');
+      });
+    });
+
+    // ---- Helper: contar seleccionados y actualizar badge ----
+    function actualizarContadorSeleccion(listaId, badgeId) {
+      const total = document.querySelectorAll(`#${listaId} .chk-cliente-oferta:checked,#${listaId} .chk-cliente-recordatorio:checked`).length;
+      const badge = document.getElementById(badgeId);
+      if (badge) badge.textContent = `${total} seleccionados`;
+    }
+
+    // ---- OFERTAS: Seleccionar todos ----
+    document.getElementById('chk-todos-oferta')?.addEventListener('change', (e) => {
+      document.querySelectorAll('#lista-clientes-oferta .chk-cliente-oferta').forEach(chk => {
+        chk.checked = e.target.checked;
+      });
+      actualizarContadorSeleccion('lista-clientes-oferta', 'oferta-seleccionados-count');
+    });
+
+    document.getElementById('lista-clientes-oferta')?.addEventListener('change', () => {
+      actualizarContadorSeleccion('lista-clientes-oferta', 'oferta-seleccionados-count');
+    });
+
+    // ---- OFERTAS: Enviar ----
+    document.getElementById('btn-enviar-oferta')?.addEventListener('click', () => {
+      const seleccionados = [...document.querySelectorAll('#lista-clientes-oferta .chk-cliente-oferta:checked')];
+      const emails = seleccionados.map(c => c.dataset.email).filter(Boolean);
+      if (emails.length === 0) {
+        Toast.show('Selecciona al menos un cliente con email', 'error');
+        return;
+      }
+      const asunto = document.getElementById('oferta-asunto')?.value || '';
+      const cuerpo = document.getElementById('oferta-cuerpo')?.value || '';
+      const mailto = `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+      window.open(mailto);
+      Toast.show(`Correo preparado para ${emails.length} cliente(s)`);
+    });
+
+    // ---- RECORDATORIOS: Filtro de inactividad ----
+    const clientesData = []; // será poblado al filtrar
+    document.querySelectorAll('.inactivity-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        document.querySelectorAll('.inactivity-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const diasMinimos = parseInt(btn.dataset.dias);
+        const clientes = await ClienteService.getAll();
+        const pedidos = await PedidoService.getAll();
+
+        const ahora = new Date();
+        const ultimaCompraPor = {};
+        pedidos.forEach(p => {
+          const prev = ultimaCompraPor[p.clienteId];
+          const fecha = new Date(p.fecha);
+          if (!prev || fecha > prev) ultimaCompraPor[p.clienteId] = fecha;
+        });
+
+        const inactivos = clientes.filter(c => {
+          const ultima = ultimaCompraPor[c.id];
+          if (!ultima) return true; // nunca ha comprado
+          const dias = Math.floor((ahora - ultima) / 86400000);
+          return dias >= diasMinimos;
+        }).sort((a, b) => {
+          const da = ultimaCompraPor[a.id] ? (ahora - ultimaCompraPor[a.id]) : Infinity;
+          const db = ultimaCompraPor[b.id] ? (ahora - ultimaCompraPor[b.id]) : Infinity;
+          return db - da;
+        });
+
+        const lista = document.getElementById('lista-clientes-recordatorio');
+        if (!lista) return;
+
+        if (inactivos.length === 0) {
+          lista.innerHTML = `<div class="clientes-empty">No hay clientes inactivos con ese criterio</div>`;
+          return;
+        }
+
+        lista.innerHTML = inactivos.map(c => {
+          const ultima = ultimaCompraPor[c.id];
+          const label = ultima
+            ? `Última compra: ${Formatters.date(ultima)}`
+            : 'Sin historial de compras';
+          return `<div class="cliente-seleccion-item">
+            <input type="checkbox" class="chk-cliente-recordatorio" data-email="${Formatters.escapeHtml(c.email || '')}" data-nombre="${Formatters.escapeHtml(c.nombre)}">
+            <span class="cliente-seleccion-nombre">${Formatters.escapeHtml(c.nombre)}</span>
+            <span class="cliente-seleccion-meta">${label}</span>
+          </div>`;
+        }).join('');
+
+        // Re-wire checkboxes del recordatorio
+        lista.addEventListener('change', () => {
+          actualizarContadorSeleccion('lista-clientes-recordatorio', 'recordatorio-seleccionados-count');
+        });
+
+        actualizarContadorSeleccion('lista-clientes-recordatorio', 'recordatorio-seleccionados-count');
+      });
+    });
+
+    // ---- RECORDATORIOS: Seleccionar todos ----
+    document.getElementById('chk-todos-recordatorio')?.addEventListener('change', (e) => {
+      document.querySelectorAll('#lista-clientes-recordatorio .chk-cliente-recordatorio').forEach(chk => {
+        chk.checked = e.target.checked;
+      });
+      actualizarContadorSeleccion('lista-clientes-recordatorio', 'recordatorio-seleccionados-count');
+    });
+
+    // ---- RECORDATORIOS: Enviar ----
+    document.getElementById('btn-enviar-recordatorio')?.addEventListener('click', () => {
+      const seleccionados = [...document.querySelectorAll('#lista-clientes-recordatorio .chk-cliente-recordatorio:checked')];
+      const emails = seleccionados.map(c => c.dataset.email).filter(Boolean);
+      if (emails.length === 0) {
+        Toast.show('Selecciona al menos un cliente con email', 'error');
+        return;
+      }
+      const asunto = document.getElementById('recordatorio-asunto')?.value || '';
+      const cuerpo = document.getElementById('recordatorio-cuerpo')?.value || '';
+      const mailto = `mailto:?bcc=${encodeURIComponent(emails.join(','))}&subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+      window.open(mailto);
+      Toast.show(`Recordatorio preparado para ${emails.length} cliente(s)`);
     });
   }
 

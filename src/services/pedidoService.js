@@ -23,6 +23,7 @@ const PedidoService = (() => {
             totalCajas: parseInt(dbPedido.total_cajas),
             estado: dbPedido.estado || 'pendiente',
             notas: dbPedido.notas || '',
+            descuento: parseFloat(dbPedido.descuento || 0),
             lineas: (dbPedido.pedido_lineas || []).map(l => ({
                 id: l.id,
                 pedidoId: l.pedido_id,
@@ -85,18 +86,21 @@ const PedidoService = (() => {
                 total_linea: (parseInt(linea.cantidad || 0)) * parseFloat(linea.precioUnitario || 0)
             }));
 
+            const descuento = parseFloat(lineas._descuento || 0);
             const subtotal = calcularSubtotal(calculatedLineas);
-            const iva = calcularIva(subtotal);
+            const subtotalConDto = subtotal * (1 - descuento / 100);
+            const iva = calcularIva(subtotalConDto);
             const totalCajas = calcularTotalCajas(calculatedLineas);
 
             // El trigger set_pedidos_user_id en la BD asigna auth.uid() automáticamente
             const pedidoParams = {
                 cliente_id: clienteId,
                 numero_pedido: numeroPedido,
-                subtotal: subtotal,
+                subtotal: subtotalConDto,
                 iva: iva,
-                total: subtotal + iva,
+                total: subtotalConDto + iva,
                 total_cajas: totalCajas,
+                descuento: descuento,
                 estado: 'pendiente',
                 notas: (lineas._notas || '')
             };
@@ -158,8 +162,10 @@ const PedidoService = (() => {
                 total_linea: (parseInt(linea.cantidad || 0)) * parseFloat(linea.precioUnitario || 0)
             }));
 
+            const descuento = lineas._descuento !== undefined ? parseFloat(lineas._descuento) : undefined;
             const subtotal = calcularSubtotal(calculatedLineas);
-            const iva = calcularIva(subtotal);
+            const subtotalConDto = descuento !== undefined ? subtotal * (1 - descuento / 100) : subtotal;
+            const iva = calcularIva(subtotalConDto);
             const totalCajas = calcularTotalCajas(calculatedLineas);
 
             // Re-insert new lines
@@ -171,13 +177,15 @@ const PedidoService = (() => {
                 if (insertError) throw insertError;
             }
 
-            // Update totals parent (preserve estado, update notas if provided)
+            // Update totals parent (preserve estado, update notas/descuento if provided)
             const updatePayload = {
-                subtotal, iva,
-                total: subtotal + iva,
+                subtotal: subtotalConDto,
+                iva,
+                total: subtotalConDto + iva,
                 total_cajas: totalCajas
             };
             if (lineas._notas !== undefined) updatePayload.notas = lineas._notas;
+            if (descuento !== undefined) updatePayload.descuento = descuento;
 
             const { error: updateError } = await supabase
                 .from('pedidos')

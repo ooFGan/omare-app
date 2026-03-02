@@ -17,6 +17,9 @@
   <script src="https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
   <script src="https://unpkg.com/jspdf-autotable@3.8.3/dist/jspdf.plugin.autotable.min.js"></script>
 
+  <!-- SheetJS (XLSX) para exportar a Excel -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -28,6 +31,7 @@
   <link rel="stylesheet" href="src/styles/login.css">
   <link rel="stylesheet" href="src/styles/pedido.css">
   <link rel="stylesheet" href="src/styles/estadisticas.css">
+  <link rel="stylesheet" href="src/styles/campanyas.css">
   <link rel="stylesheet" href="src/styles/responsive.css">
 
   <!-- Favicon inline (crimson O) -->
@@ -46,15 +50,16 @@
   </div>
 
   <!-- Scripts (order matters: services first, then utils, then app) -->
-  <script src="src/utils/formatters.js?v=1.0.6"></script>
-  <script src="src/utils/supabaseClient.js?v=1.0.6"></script>
-  <script src="src/utils/toast.js?v=1.0.6"></script>
-  <script src="src/services/csvService.js?v=1.0.6"></script>
-  <script src="src/services/authService.js?v=1.0.6"></script>
-  <script src="src/services/clienteService.js?v=1.0.6"></script>
-  <script src="src/services/pedidoService.js?v=1.0.6"></script>
-  <script src="src/utils/pdfGenerator.js?v=1.0.6"></script>
-  <script src="src/app.js?v=1.0.6"></script>
+  <script src="src/utils/formatters.js?v=1.1.0"></script>
+  <script src="src/utils/supabaseClient.js?v=1.1.0"></script>
+  <script src="src/utils/toast.js?v=1.1.0"></script>
+  <script src="src/utils/excelExporter.js?v=1.1.0"></script>
+  <script src="src/services/csvService.js?v=1.1.0"></script>
+  <script src="src/services/authService.js?v=1.1.0"></script>
+  <script src="src/services/clienteService.js?v=1.1.0"></script>
+  <script src="src/services/pedidoService.js?v=1.1.0"></script>
+  <script src="src/utils/pdfGenerator.js?v=1.1.0"></script>
+  <script src="src/app.js?v=1.1.0"></script>
 </body>
 
 </html>
