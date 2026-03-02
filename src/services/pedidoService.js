@@ -88,13 +88,17 @@ const PedidoService = (() => {
             const iva = calcularIva(subtotal);
             const totalCajas = calcularTotalCajas(calculatedLineas);
 
+            const user = AuthService.getCurrentUser();
+            if (!user) throw new Error('Usuario no autenticado');
+
             const pedidoParams = {
                 cliente_id: clienteId,
                 numero_pedido: numeroPedido,
                 subtotal: subtotal,
                 iva: iva,
                 total: subtotal + iva,
-                total_cajas: totalCajas
+                total_cajas: totalCajas,
+                user_id: user.id
             };
 
             const { data: pedidoData, error: pedidoError } = await supabase
