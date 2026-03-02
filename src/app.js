@@ -468,8 +468,13 @@ const App = (() => {
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-ghost" id="modal-cliente-cancel">Cancelar</button>
-            <button class="btn btn-primary" id="modal-cliente-save">Guardar</button>
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+              <button class="btn btn-danger" id="modal-cliente-eliminar">🗑️ Eliminar Cliente</button>
+              <div style="display:flex;gap:var(--spacing-md)">
+                <button class="btn btn-ghost" id="modal-cliente-cancel">Cancelar</button>
+                <button class="btn btn-primary" id="modal-cliente-save">Guardar</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -914,6 +919,21 @@ const App = (() => {
         } else {
           navigateTo('clientes');
         }
+      } else {
+        Toast.show(result.error, 'error');
+      }
+    });
+
+    // Eliminar cliente (solo visible en modo editar)
+    document.getElementById('modal-cliente-eliminar')?.addEventListener('click', async () => {
+      const id = document.getElementById('cliente-edit-id')?.value;
+      if (!id) return;
+      if (!confirm('¿Seguro que deseas eliminar este cliente? Se eliminar¿n tambien todos sus pedidos.')) return;
+      const result = await ClienteService.eliminar(id);
+      if (result.success) {
+        hideModal('modal-cliente');
+        Toast.show('Cliente eliminado correctamente');
+        navigateTo('clientes');
       } else {
         Toast.show(result.error, 'error');
       }
