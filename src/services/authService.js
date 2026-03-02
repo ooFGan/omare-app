@@ -44,6 +44,14 @@ const AuthService = (() => {
                 return { success: false, error: 'Credenciales incorrectas' };
             }
 
+            // Establecer la sesión explícitamente para que el SDK incluya el JWT en todas las llamadas API
+            if (data.session) {
+                await supabase.auth.setSession({
+                    access_token: data.session.access_token,
+                    refresh_token: data.session.refresh_token
+                });
+            }
+
             currentUser = data.user;
             return { success: true, user: getCurrentUser() };
         } catch (e) {
