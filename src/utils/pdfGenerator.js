@@ -196,6 +196,22 @@ const PdfGenerator = (() => {
             doc.setFontSize(10);
             doc.setFont('helvetica', 'normal');
 
+            // Mostrar descuento si existe
+            if (pedido.descuento > 0) {
+                const subtotalBruto = pedido.subtotal / (1 - pedido.descuento / 100);
+                const importeDto = subtotalBruto - pedido.subtotal;
+
+                doc.text('Subtotal:', summaryX, y);
+                doc.text(safeCurrency(subtotalBruto), pageWidth - margin, y, { align: 'right' });
+                y += 6;
+
+                doc.setTextColor(200, 0, 0);
+                doc.text(`Descuento (${pedido.descuento}%):`, summaryX, y);
+                doc.text(`-${safeCurrency(importeDto)}`, pageWidth - margin, y, { align: 'right' });
+                doc.setTextColor(20, 20, 20);
+                y += 6;
+            }
+
             doc.text('Base Imponible:', summaryX, y);
             doc.text(safeCurrency(pedido.subtotal), pageWidth - margin, y, { align: 'right' });
             y += 6;

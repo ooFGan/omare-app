@@ -607,7 +607,7 @@ const App = (() => {
               <div class="order-summary-row" style="align-items:center">
                 <span class="label">Descuento (%):</span>
                 <input type="number" id="input-descuento" min="0" max="100" step="0.5"
-                  value="0" style="width:70px;text-align:right;padding:2px 6px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:var(--font-size-sm)">
+                  value="${pedidoLineas._descuento || 0}" style="width:70px;text-align:right;padding:2px 6px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:var(--font-size-sm)">
               </div>
               <div class="order-summary-row">
                 <span class="label">IVA (21%):</span>
@@ -779,7 +779,11 @@ const App = (() => {
      ================================================ */
 
   function calculateTotals() {
-    const subtotal = pedidoLineas.reduce((sum, l) => sum + (l.totalLinea || 0), 0);
+    const subtotalBruto = pedidoLineas.reduce((sum, l) => sum + (l.totalLinea || 0), 0);
+    // Leer el descuento del input (si existe en el DOM; si no, del array)
+    const descuentoEl = document.getElementById('input-descuento');
+    const descuento = descuentoEl ? (parseFloat(descuentoEl.value) || 0) : (pedidoLineas._descuento || 0);
+    const subtotal = subtotalBruto * (1 - descuento / 100);
     const iva = subtotal * PedidoService.IVA_RATE;
     const totalCajas = pedidoLineas.reduce((sum, l) => sum + (l.cajas || 0), 0);
     return {
@@ -1059,7 +1063,7 @@ const App = (() => {
     document.getElementById('modal-cliente-eliminar')?.addEventListener('click', async () => {
       const id = document.getElementById('cliente-edit-id')?.value;
       if (!id) return;
-      if (!confirm('¿Seguro que deseas eliminar este cliente? Se eliminar¿n tambien todos sus pedidos.')) return;
+      if (!confirm('¿Seguro que deseas eliminar este cliente? Se eliminarán también todos sus pedidos.')) return;
       const result = await ClienteService.eliminar(id);
       if (result.success) {
         hideModal('modal-cliente');
@@ -1292,6 +1296,9 @@ const App = (() => {
       currentEditingPedidoId = null;
       navigateTo('clienteDetalle');
     });
+
+    // Recalcular resumen al cambiar el descuento
+    document.getElementById('input-descuento')?.addEventListener('input', updateSummary);
   }
 
   function attachLineaEvents() {
@@ -1369,6 +1376,8 @@ const App = (() => {
       return;
     }
 
+    const descuento = parseFloat(document.getElementById('input-descuento')?.value || 0);
+    pedidoLineas._descuento = descuento;
     const result = await PedidoService.crear(currentClienteId, pedidoLineas);
     if (result.success) {
       Toast.show(`Pedido ${result.pedido.numeroPedido} guardado`);
@@ -1390,6 +1399,8 @@ const App = (() => {
       return;
     }
 
+    const descuento = parseFloat(document.getElementById('input-descuento')?.value || 0);
+    pedidoLineas._descuento = descuento;
     const result = await PedidoService.crear(currentClienteId, pedidoLineas);
     if (result.success) {
       const cliente = await ClienteService.getById(currentClienteId);
@@ -1416,6 +1427,7 @@ const App = (() => {
     currentClienteId = pedido.clienteId;
     // Cargar las líneas existentes en el estado de edición
     pedidoLineas = pedido.lineas.map(l => ({ ...l }));
+    pedidoLineas._descuento = pedido.descuento || 0; // Restaurar descuento del pedido al editar
     navigateTo('nuevoPedido');
   }
 
@@ -1423,6 +1435,8 @@ const App = (() => {
    * Guarda los cambios de un pedido existente
    */
   async function updatePedido() {
+    const descuento = parseFloat(document.getElementById('input-descuento')?.value || 0);
+    pedidoLineas._descuento = descuento;
     const result = await PedidoService.actualizarLineas(currentEditingPedidoId, pedidoLineas);
     if (result.success) {
       Toast.show(`Pedido ${result.pedido.numeroPedido} actualizado`);
@@ -1463,6 +1477,9 @@ const App = (() => {
     });
 
     body += `\nTotal Cajas: ${pedido.totalCajas}`;
+    if (pedido.descuento > 0) {
+      body += `\nDescuento aplicado: ${pedido.descuento}%`;
+    }
     body += `\nBase Imponible: ${Formatters.currency(pedido.subtotal)}`;
     body += `\nIVA (21%): ${Formatters.currency(pedido.iva)}`;
     body += `\nTOTAL: ${Formatters.currency(pedido.total)}`;
