@@ -1,0 +1,94 @@
+/* =========================================
+   Login Page Styles
+   ========================================= */
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1A1A2E 0%, #16213E 50%, #E4003A 100%);
+    padding: var(--spacing-base);
+}
+
+.login-card {
+    background: var(--color-surface);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    padding: var(--spacing-3xl);
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+}
+
+.login-logo {
+    width: 64px;
+    height: 64px;
+    background: var(--color-primary);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto var(--spacing-xl);
+    font-size: var(--font-size-2xl);
+    color: white;
+    font-weight: var(--font-weight-bold);
+}
+
+.login-title {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.login-subtitle {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-2xl);
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.login-form .form-group {
+    text-align: left;
+}
+
+.login-form .form-input {
+    width: 100%;
+}
+
+.login-error {
+    background: rgba(220, 53, 69, 0.08);
+    color: var(--color-danger);
+    padding: var(--spacing-sm) var(--spacing-base);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    display: none;
+}
+
+.login-error.visible {
+    display: block;
+}
+
+.login-form .btn-primary {
+    width: 100%;
+    padding: var(--spacing-base);
+    font-size: var(--font-size-md);
+}
+
+.login-demo-hint {
+    margin-top: var(--spacing-xl);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    background: var(--color-primary-bg);
+    padding: var(--spacing-sm) var(--spacing-base);
+    border-radius: var(--radius-md);
+}
+
+.login-demo-hint strong {
+    color: var(--color-primary);
+}

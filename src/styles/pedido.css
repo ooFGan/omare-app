@@ -1,0 +1,101 @@
+/* =========================================
+   Pedido (Order) View Styles
+   ========================================= */
+
+.pedido-top-bar {
+    background: var(--color-primary);
+    color: var(--color-text-on-primary);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-xl);
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.pedido-top-bar-title {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+}
+
+.pedido-top-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.pedido-top-bar .btn-outline {
+    border-color: rgba(255, 255, 255, 0.7);
+    color: white;
+}
+
+.pedido-top-bar .btn-outline:hover {
+    background: white;
+    color: var(--color-primary);
+    border-color: white;
+}
+
+.pedido-top-bar .btn-success {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.pedido-client-info {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    border: 1px solid var(--color-border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.pedido-client-name {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+}
+
+.pedido-client-date {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+.pedido-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: var(--spacing-xl);
+    align-items: start;
+}
+
+.pedido-search-section {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    border: 1px solid var(--color-border-light);
+}
+
+.pedido-search-section .search-container {
+    max-width: 600px;
+}
+
+.pedido-table-section {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-light);
+    overflow: hidden;
+}
+
+/* Pedido view in pedido history (read-only) */
+.pedido-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-xl);
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
