@@ -55,7 +55,7 @@ const AuthService = (() => {
      * Intenta registrar un nuevo usuario
      * @param {string} email
      * @param {string} password
-     * @returns {Promise<{ success: boolean, error?: string, user?: Object }>}
+     * @returns {Promise<{ success: boolean, error?: string, user?: Object, requiresEmailConfirmation?: boolean }>}
      */
     async function register(email, password) {
         if (!email || !password) {
@@ -72,8 +72,19 @@ const AuthService = (() => {
                 return { success: false, error: 'Error al registrar: ' + error.message };
             }
 
-            currentUser = data.user;
-            return { success: true, user: getCurrentUser() };
+            // Supabase por defecto requiere confirmación de email.
+            // Si data.session es null, significa que la cuenta se creó pero requiere confirmar el email antes de hacer login.
+            if (!data.session) {
+                // No hay sesión activa, el usuario debe verificar su correo o el administrador debe desactivar la confirmación de email.
+                return {
+                    success: true,
+                    user: null,
+                    requiresEmailConfirmation: true
+                };
+            }
+
+            currentUser = data.session.user;
+            return { success: true, user: getCurrentUser(), requiresEmailConfirmation: false };
         } catch (e) {
             return { success: false, error: e.message };
         }

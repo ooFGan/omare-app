@@ -245,16 +245,19 @@ const App = (() => {
       btnSubmit.disabled = false;
 
       if (result.success) {
-        Toast.show(isRegister ? 'Cuenta creada, inicie sesión o confirme email (si lo requiere el servidor)' : 'Sesión iniciada correctamente');
-        if (!isRegister || result.user) {
-          navigateTo('clientes');
-        } else {
-          // Regresar al modo login si el registro no auto-loguea (por check de email)
+        if (isRegister && result.requiresEmailConfirmation) {
+          Toast.show('🎉 Cuenta creada. Revise su correo (y la carpeta de Spam) para confirmarla antes de iniciar sesión.');
+          // Regresar al modo login
           modeInput.value = 'login';
           btnSubmit.textContent = 'Iniciar Sesión';
           toggleAuth.textContent = '¿No tienes cuenta? Regístrate';
           groupConfirm.style.display = 'none';
           inputConfirm.removeAttribute('required');
+          document.getElementById('login-password').value = '';
+          inputConfirm.value = '';
+        } else {
+          Toast.show('Sesión iniciada correctamente');
+          navigateTo('clientes');
         }
       } else {
         errorEl.textContent = result.error;
