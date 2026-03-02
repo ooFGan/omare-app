@@ -394,7 +394,7 @@ const App = (() => {
                    <td>
                      <div class="cell-actions">
                        <button class="btn btn-sm btn-ghost" data-action="ver-pedido" data-pedido-id="${p.id}" title="Ver">👁️</button>
-                       <button class="btn btn-sm btn-ghost" data-action="editar-pedido" data-pedido-id="${p.id}" title="Editar">&#x270F;&#xFE0F;</button>
+                       <button class="btn btn-sm btn-ghost" data-action="editar-pedido" data-pedido-id="${p.id}" title="Editar">✏️</button>
                         <button class="btn btn-sm btn-ghost" data-action="pdf-pedido" data-pedido-id="${p.id}" title="PDF">📄</button>
                        <button class="btn btn-sm btn-ghost" data-action="repetir-pedido" data-pedido-id="${p.id}" title="Repetir">🔄</button>
                        <button class="btn btn-sm btn-danger" data-action="eliminar-pedido" data-pedido-id="${p.id}" title="Eliminar">🗑️</button>
